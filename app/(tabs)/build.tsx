@@ -140,7 +140,7 @@ export default function BuildScreen() {
     addBuildLog(`Found ${validation.composableCount} @Composable functions`, 'info');
 
     // Determine target file
-    const targetFile = currentFile || `Module_v${moduleVersion}.kt`;
+    const targetFile = currentFile || `Module_${Date.now()}.kt`;
     
     try {
       // Apply to editor (this saves to async-storage)
@@ -151,8 +151,7 @@ export default function BuildScreen() {
       addBuildLog('Module version incremented', 'info');
 
       await new Promise(r => setTimeout(r, 400));
-
-      addBuildLog('Code ready in IDE', 'success');
+      addBuildLog('Hot-reload triggered - code updated in IDE', 'success');
 
       setIsCompiling(false);
 
@@ -167,7 +166,7 @@ export default function BuildScreen() {
       addBuildLog(`Save failed: ${err.message}`, 'error');
       setIsCompiling(false);
     }
-  }, [generatedCode, currentFile, moduleVersion, applyToEditor, incrementModuleVersion, addBuildLog]);
+  }, [generatedCode, currentFile, applyToEditor, incrementModuleVersion, addBuildLog]);
 
   // Basic Kotlin syntax validator
   function validateKotlinCode(code: string): { valid: boolean; error?: string; composableCount: number } {
