@@ -12,7 +12,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { reloadAppAsync } from 'expo';
 import colors from '@/constants/colors';
 import { useApp, generateId } from '@/lib/app-context';
 import { streamFromApi } from '@/lib/streaming';
@@ -122,46 +121,83 @@ export default function BuildScreen() {
       Alert.alert('No Code', 'Generate a module first');
       return;
     }
+
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setIsCompiling(true);
-    addBuildLog('Compiling module...', 'info');
+    addBuildLog('Validating Kotlin syntax...', 'info');
 
-    await new Promise(r => setTimeout(r, 800));
-    addBuildLog('Bytecode verification passed', 'success');
+    // Basic Kotlin validation
+    const validation = validateKotlinCode(generatedCode);
+    
+    if (!validation.valid) {
+      addBuildLog(`Syntax error: ${validation.error}`, 'error');
+      setIsCompiling(false);
+      Alert.alert('Validation Failed', validation.error || 'Code contains errors');
+      return;
+    }
 
-    await new Promise(r => setTimeout(r, 500));
-    const targetFile = currentFile || 'generated.kt';
-    applyToEditor(generatedCode, targetFile);
-    addBuildLog(`Code written to external storage: ${targetFile}`, 'success');
-    addBuildLog('Module loaded dynamically via SplitCompat', 'success');
+    addBuildLog('Syntax validation passed', 'success');
+    addBuildLog(`Found ${validation.composableCount} @Composable functions`, 'info');
 
-    incrementModuleVersion();
-    addBuildLog('Module version incremented', 'info');
+    // Determine target file
+    const targetFile = currentFile || `Module_v${moduleVersion}.kt`;
+    
+    try {
+      // Apply to editor (this saves to async-storage)
+      applyToEditor(generatedCode, targetFile);
+      addBuildLog(`Saved to: ${targetFile}`, 'success');
 
-    await new Promise(r => setTimeout(r, 400));
-    addBuildLog('Hot-reload triggered - code updated in IDE', 'success');
-    addBuildLog('Self-evolution cycle complete', 'success');
+      incrementModuleVersion();
+      addBuildLog(`Version incremented to v${moduleVersion + 1}`, 'info');
+      addBuildLog('Code ready in IDE', 'success');
 
-    setIsCompiling(false);
+      setIsCompiling(false);
 
-    Alert.alert(
-      'Module Loaded',
-      'Code has been saved to external storage and applied to the IDE. Restart the app to use the updated module?',
-      [
-        { text: 'Later', style: 'cancel' },
-        {
-          text: 'Restart Now',
-          onPress: async () => {
-            try {
-              await reloadAppAsync();
-            } catch {
-              addBuildLog('Manual restart required', 'warning');
-            }
-          },
-        },
-      ],
-    );
-  }, [generatedCode, currentFile, applyToEditor, incrementModuleVersion, addBuildLog]);
+      Alert.alert(
+        'Code Saved',
+        `Saved to ${targetFile}. Open the IDE tab to view and edit.`,
+        [
+          { text: 'OK', style: 'default' },
+        ],
+      );
+    } catch (err: any) {
+      addBuildLog(`Save failed: ${err.message}`, 'error');
+      setIsCompiling(false);
+    }
+  }, [generatedCode, currentFile, moduleVersion, applyToEditor, incrementModuleVersion, addBuildLog]);
+
+  // Basic Kotlin syntax validator
+  function validateKotlinCode(code: string): { valid: boolean; error?: string; composableCount: number } {
+    // Check for basic structure
+    if (!code.includes('package')) {
+      return { valid: false, error: 'Missing package declaration', composableCount: 0 };
+    }
+
+    // Count composable functions
+    const composableMatches = code.match(/@Composable\s*\n?\s*fun/g) || [];
+    const composableCount = composableMatches.length;
+
+    // Check for balanced braces
+    let braceCount = 0;
+    for (const char of code) {
+      if (char === '{') braceCount++;
+      if (char === '}') braceCount--;
+      if (braceCount < 0) {
+        return { valid: false, error: 'Unbalanced braces - too many closing braces', composableCount };
+      }
+    }
+
+    if (braceCount !== 0) {
+      return { valid: false, error: `Unbalanced braces - ${braceCount} unclosed`, composableCount };
+    }
+
+    // Check for import statements if using Compose
+    if (code.includes('@Composable') && !code.includes('import androidx.compose')) {
+      return { valid: false, error: 'Missing Compose imports', composableCount };
+    }
+
+    return { valid: true, composableCount };
+  }
 
   const monoFont = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' });
 

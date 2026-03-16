@@ -259,11 +259,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const proxyReq = https.request(options, (proxyRes) => {
         let buffer = "";
 
-        proxyReq.on("error", (err) => {
-          res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
-          res.end();
-        });
-
         proxyRes.on("data", (chunk: Buffer) => {
           buffer += chunk.toString();
           const lines = buffer.split("\n");
@@ -312,6 +307,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       });
 
+      // Error handler must be attached before end()
       proxyReq.on("error", (err) => {
         res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
         res.end();

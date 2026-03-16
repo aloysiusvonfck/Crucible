@@ -30,9 +30,13 @@ function setupCors(app: express.Application) {
     const origin = req.header("origin");
 
     // Allow localhost origins for Expo web development (any port)
+    // Also allow Android emulator (10.0.2.2) and Expo dev client
     const isLocalhost =
       origin?.startsWith("http://localhost:") ||
-      origin?.startsWith("http://127.0.0.1:");
+      origin?.startsWith("http://127.0.0.1:") ||
+      origin?.startsWith("http://10.0.2.2:") ||  // Android emulator
+      origin?.startsWith("exp://") ||           // Expo dev client
+      origin?.startsWith("http://[::1]:");      // IPv6 localhost
 
     if (origin && (origins.has(origin) || isLocalhost)) {
       res.header("Access-Control-Allow-Origin", origin);
@@ -40,7 +44,7 @@ function setupCors(app: express.Application) {
         "Access-Control-Allow-Methods",
         "GET, POST, PUT, DELETE, OPTIONS",
       );
-      res.header("Access-Control-Allow-Headers", "Content-Type");
+      res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
       res.header("Access-Control-Allow-Credentials", "true");
     }
 
