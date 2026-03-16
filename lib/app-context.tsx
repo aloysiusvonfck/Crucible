@@ -125,7 +125,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         const key = await SecureStore.getItemAsync(STORAGE_KEYS.API_KEY);
         if (key) setApiKeyState(key);
-      } catch {}
+      } catch (err) {
+        console.error('Failed to load API key:', err);
+      }
       setIsKeyLoaded(true);
 
       try {
@@ -143,7 +145,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setEditorCode(DEFAULT_FILE.content);
           await AsyncStorage.setItem(STORAGE_KEYS.FILES, JSON.stringify([DEFAULT_FILE]));
         }
-      } catch {
+      } catch (err) {
+        console.error('Failed to load files:', err);
         setFiles([DEFAULT_FILE]);
         setCurrentFile(DEFAULT_FILE.name);
         setEditorCode(DEFAULT_FILE.content);
@@ -152,12 +155,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         const msgs = await AsyncStorage.getItem(STORAGE_KEYS.MESSAGES);
         if (msgs) setChatMessages(JSON.parse(msgs));
-      } catch {}
+      } catch (err) {
+        console.error('Failed to load chat messages:', err);
+      }
 
       try {
         const ver = await AsyncStorage.getItem(STORAGE_KEYS.MODULE_VERSION);
         if (ver) setModuleVersion(parseInt(ver, 10));
-      } catch {}
+      } catch (err) {
+        console.error('Failed to load module version:', err);
+      }
     })();
   }, []);
 

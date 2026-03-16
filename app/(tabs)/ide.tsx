@@ -142,11 +142,31 @@ export default function IDEScreen() {
   const handleCreateFile = useCallback(async () => {
     const name = newFileName.trim();
     if (!name) return;
-    await createFile(name.endsWith('.kt') ? name : `${name}.kt`);
+    
+    const invalidChars = /[\\/:*?"<>|]/;
+    if (invalidChars.test(name)) {
+      Alert.alert('Invalid Filename', 'Filename cannot contain: \\\ / : * ? " < > |');
+      return;
+    }
+    
+    if (name.length > 255) {
+      Alert.alert('Invalid Filename', 'Filename too long (max 255 characters)');
+      return;
+    }
+    
+    const finalName = name.endsWith('.kt') ? name : `${name}.kt`;
+    
+    // Check for duplicate names
+    if (files.some(f => f.name === finalName)) {
+      Alert.alert('File Exists', `A file named "${finalName}" already exists`);
+      return;
+    }
+    
+    await createFile(finalName);
     setNewFileName('');
     setShowNewFile(false);
     setShowBrowser(false);
-  }, [newFileName, createFile]);
+  }, [newFileName, createFile, files]);
 
   const handleDeleteFile = useCallback((name: string) => {
     Alert.alert('Delete File', `Delete ${name}?`, [

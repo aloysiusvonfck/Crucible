@@ -148,7 +148,10 @@ export default function BuildScreen() {
       addBuildLog(`Saved to: ${targetFile}`, 'success');
 
       incrementModuleVersion();
-      addBuildLog(`Version incremented to v${moduleVersion + 1}`, 'info');
+      addBuildLog('Module version incremented', 'info');
+
+      await new Promise(r => setTimeout(r, 400));
+
       addBuildLog('Code ready in IDE', 'success');
 
       setIsCompiling(false);
