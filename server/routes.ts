@@ -1,6 +1,11 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "node:http";
 import https from "node:https";
+import { Octokit } from "@octokit/rest";
+
+const octokit = new Octokit({
+  auth: process.env.GITHUB_TOKEN,
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/chat", async (req: Request, res: Response) => {
@@ -319,6 +324,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!res.headersSent) {
         res.status(500).json({ error: err.message });
       }
+    }
+  });
+
+  app.post("/api/compile", async (req: Request, res: Response) => {
+    try {
+      const { code, fileName } = req.body;
+      
+      if (!code) {
+        return res.status(400).json({ error: "No code provided" });
+      }
+
+      if (!process.env.GITHUB_TOKEN || !process.env.GITHUB_REPO) {
+        return res.status(500).json({ error: "GitHub credentials not configured" });
+      }
+
+      // Trigger GitHub Actions workflow
+      await octokit.repos.createDispatchEvent({
+        owner: "aloysiusvonfck",
+        repo: process.env.GITHUB_REPO,
+        event_type: "compile-module",
+        client_payload: {
+          code: code,
+          file_name: fileName || "main.kt",
+        },
+      });
+
+      res.json({ 
+        success: true, 
+        message: "Compilation job triggered. Check GitHub Actions for status.",
+        workflow_url: `https://github.com/aloysiusvonfck/${process.env.GITHUB_REPO}/actions`
+      });
+    } catch (err: any) {
+      console.error("Compile trigger failed:", err);
+      res.status(500).json({ error: err.message });
     }
   });
 

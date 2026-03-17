@@ -15,6 +15,7 @@ import * as Haptics from 'expo-haptics';
 import colors from '@/constants/colors';
 import { useApp, generateId } from '@/lib/app-context';
 import { streamFromApi } from '@/lib/streaming';
+import { getApiUrl } from '@/lib/query-client';
 
 const C = colors.dark;
 
@@ -121,49 +122,46 @@ export default function BuildScreen() {
       Alert.alert('No Code', 'Generate a module first');
       return;
     }
-
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setIsCompiling(true);
-    addBuildLog('Validating Kotlin syntax...', 'info');
+    addBuildLog('Sending code to GitHub Actions for compilation...', 'info');
 
-    // Basic Kotlin validation
-    const validation = validateKotlinCode(generatedCode);
-    
-    if (!validation.valid) {
-      addBuildLog(`Syntax error: ${validation.error}`, 'error');
-      setIsCompiling(false);
-      Alert.alert('Validation Failed', validation.error || 'Code contains errors');
-      return;
-    }
-
-    addBuildLog('Syntax validation passed', 'success');
-    addBuildLog(`Found ${validation.composableCount} @Composable functions`, 'info');
-
-    // Determine target file
-    const targetFile = currentFile || `Module_${Date.now()}.kt`;
-    
     try {
-      // Apply to editor (this saves to async-storage)
+      const response = await fetch(`${getApiUrl()}api/compile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          code: generatedCode, 
+          fileName: currentFile || 'main.kt' 
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Compilation failed');
+      }
+
+      addBuildLog('Compilation job triggered successfully', 'success');
+      addBuildLog(`Check status at: ${result.workflow_url}`, 'info');
+      
+      // Save locally while waiting
+      const targetFile = currentFile || 'generated.kt';
       applyToEditor(generatedCode, targetFile);
-      addBuildLog(`Saved to: ${targetFile}`, 'success');
-
+      addBuildLog(`Code saved locally: ${targetFile}`, 'success');
+      
       incrementModuleVersion();
-      addBuildLog('Module version incremented', 'info');
-
-      await new Promise(r => setTimeout(r, 400));
-      addBuildLog('Hot-reload triggered - code updated in IDE', 'success');
+      addBuildLog('Version incremented (local)', 'info');
 
       setIsCompiling(false);
 
       Alert.alert(
-        'Code Saved',
-        `Saved to ${targetFile}. Open the IDE tab to view and edit.`,
-        [
-          { text: 'OK', style: 'default' },
-        ],
+        'Compilation Started',
+        `GitHub Actions is building your APK. Check the Actions tab in your repo for progress.\n\nCode has been saved locally.`,
+        [{ text: 'OK' }],
       );
     } catch (err: any) {
-      addBuildLog(`Save failed: ${err.message}`, 'error');
+      addBuildLog(`Compilation trigger failed: ${err.message}`, 'error');
       setIsCompiling(false);
     }
   }, [generatedCode, currentFile, applyToEditor, incrementModuleVersion, addBuildLog]);
